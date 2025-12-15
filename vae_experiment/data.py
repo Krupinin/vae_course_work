@@ -1,12 +1,9 @@
+""" Работа с данными. """
+
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Subset
 from config import device, batch_size, class_idx
 
-#############################
-#############################
-# Датасеты
-#############################
-#############################
 
 transform = transforms.Compose([
     transforms.ToTensor(),   # [0,1]
@@ -37,6 +34,6 @@ train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_wor
 val_loader   = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=False)
 test_loader  = DataLoader(test_ds, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=False)
 
-print("Train size (normal only):", len(train_ds))
-print("Val size (normal/anom):", len(val_ds), f"({n_norm_val} normal, {n_anom_val} anom)")
-print("Test size (normal/anom):", len(test_ds), f"({n_norm_test} normal, {n_anom_test} anom)")
+# print("Train size (normal only):", len(train_ds))
+# print("Val size (normal/anom):", len(val_ds), f"({n_norm_val} normal, {n_anom_val} anom)")
+# print("Test size (normal/anom):", len(test_ds), f"({n_norm_test} normal, {n_anom_test} anom)")

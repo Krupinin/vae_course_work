@@ -1,13 +1,10 @@
+""" Обучение эпохи """
+
 from tqdm import tqdm
 import torch
 from losses import recon_mse, kl_divergence
 from config import device
 
-#############################
-#############################
-# Обучение
-#############################
-#############################
 
 def train_epoch(epoch, model, optimizer, train_loader, alpha):
     model.train()
