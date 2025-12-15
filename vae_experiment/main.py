@@ -8,7 +8,7 @@ from data import train_loader, val_loader, test_loader
 from model import ConvVAE
 from train import train_epoch
 from evaluate import compute_mse_kl_stats, evaluate, evaluate_per_class
-from visualisation import visulize_model_recon_examples, visualize_ROC_curves, visualize_per_class_auc
+from visualisation import visulize_model_recon_examples, visualize_ROC_curves, visualize_per_class_auc, visualize_latent_space
 import torch
 import os
 
@@ -85,7 +85,7 @@ def train_full_model(optimal_alpha):
             torch.save(model.state_dict(), save_path)
             print(f"Model saved at epoch {epoch}")
 
-    visulize_model_recon_examples(model)
+    
 
     return model
 
@@ -134,6 +134,9 @@ def main():
         os.makedirs(os.path.dirname(final_save_path), exist_ok=True)
         torch.save(trained_model.state_dict(), final_save_path)
         print(f"Final model saved to {final_save_path}")
+
+    visulize_model_recon_examples(trained_model)
+    visualize_latent_space(trained_model)
 
     print_in_frame("Step 3: Evaluate on test set")
     test_results = evaluate(trained_model, test_loader, optimal_alpha, split_name="test")

@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 from torchvision import utils
 import torch
 import os
-from data import test_loader
+from data import test_loader, val_loader
 from config import *
 from sklearn.metrics import roc_auc_score, roc_curve
 
@@ -86,3 +86,37 @@ def visualize_per_class_auc(per_class_results):
     os.makedirs('diagrams', exist_ok=True)
     plt.savefig('diagrams/per_class_auc.png')
     plt.close()
+
+def visualize_latent_space(model):
+    # 4. Визуализация латентного пространства (2D проекция)
+    if latent_dim >= 2:
+        model.eval()
+        latents = []
+        labels_list = []
+
+        with torch.no_grad():
+            for x, y in val_loader:
+                x = x.to(device)
+                _, mu, _, _ = model(x)
+                latents.append(mu.cpu().numpy())
+                labels_list.append(y.numpy())
+
+        latents = np.concatenate(latents)
+        labels_list = np.concatenate(labels_list)
+
+        # Используем PCA для визуализации многомерного пространства
+        from sklearn.decomposition import PCA
+        pca = PCA(n_components=2)
+        latents_2d = pca.fit_transform(latents)
+
+        plt.figure(figsize=(10, 8))
+        scatter = plt.scatter(latents_2d[:, 0], latents_2d[:, 1],
+                            c=labels_list, cmap='coolwarm', alpha=0.6)
+        plt.colorbar(scatter, label='Class (0=Normal, 1=Anomaly)')
+        plt.xlabel('First Principal Component')
+        plt.ylabel('Second Principal Component')
+        plt.title('2D Projection of Latent Space (PCA)')
+        # plt.show()
+        os.makedirs('diagrams', exist_ok=True)
+        plt.savefig('diagrams/latent_space.png')
+        plt.close()
