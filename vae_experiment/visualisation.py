@@ -5,7 +5,7 @@ import os
 import numpy as np
 from data import test_loader, val_loader
 from config import *
-from sklearn.metrics import roc_auc_score, roc_curve
+from sklearn.metrics import roc_auc_score, roc_curve, precision_recall_curve, average_precision_score
 from sklearn.decomposition import PCA
 
 def visulize_model_recon_examples(model):
@@ -30,35 +30,47 @@ def visulize_model_recon_examples(model):
     plt.close()
 
 def visualize_ROC_curves(test_metrics):
-    """ Визуализация ROC кривых """
+    """ Визуализация ROC кривых с указанием оптимальных порогов """
     plt.figure(figsize=(10, 8))
 
     # Negative ELBO ROC
-    fpr_elbo, tpr_elbo, _ = roc_curve(test_metrics["labels"], test_metrics["neg_elbo"])
+    fpr_elbo, tpr_elbo, thresholds_elbo = roc_curve(test_metrics["labels"], test_metrics["neg_elbo"])
     auc_elbo = roc_auc_score(test_metrics["labels"], test_metrics["neg_elbo"])
+    thresh_elbo = test_metrics["thresh_elbo"]
+    idx_elbo = np.argmin(np.abs(thresholds_elbo - thresh_elbo))
+    plt.plot(fpr_elbo, tpr_elbo, label=f'Negative ELBO (AUC = {auc_elbo:.3f})', linewidth=2)
+    plt.plot(fpr_elbo[idx_elbo], tpr_elbo[idx_elbo], 'ro', markersize=8, label=f'ELBO Threshold ({thresh_elbo:.2f})')
 
     # Reconstruction Error ROC
-    fpr_recon, tpr_recon, _ = roc_curve(test_metrics["labels"], test_metrics["recon_err"])
+    fpr_recon, tpr_recon, thresholds_recon = roc_curve(test_metrics["labels"], test_metrics["recon_err"])
     auc_recon = roc_auc_score(test_metrics["labels"], test_metrics["recon_err"])
+    thresh_recon = test_metrics["thresh_recon"]
+    idx_recon = np.argmin(np.abs(thresholds_recon - thresh_recon))
+    plt.plot(fpr_recon, tpr_recon, label=f'Reconstruction Error (AUC = {auc_recon:.3f})', linewidth=2)
+    plt.plot(fpr_recon[idx_recon], tpr_recon[idx_recon], 'go', markersize=8, label=f'Recon Threshold ({thresh_recon:.2f})')
 
     # Latent Energy ROC
-    fpr_latent, tpr_latent, _ = roc_curve(test_metrics["labels"], test_metrics["latent_energy"])
+    fpr_latent, tpr_latent, thresholds_latent = roc_curve(test_metrics["labels"], test_metrics["latent_energy"])
     auc_latent = roc_auc_score(test_metrics["labels"], test_metrics["latent_energy"])
+    thresh_latent = test_metrics["thresh_latent"]
+    idx_latent = np.argmin(np.abs(thresholds_latent - thresh_latent))
+    plt.plot(fpr_latent, tpr_latent, label=f'Latent Energy (AUC = {auc_latent:.3f})', linewidth=2)
+    plt.plot(fpr_latent[idx_latent], tpr_latent[idx_latent], 'mo', markersize=8, label=f'Latent Threshold ({thresh_latent:.2f})')
 
     # Latent PCA p-value ROC (higher anomaly score = more anomalous)
     if "latent_p_value" in test_metrics and np.any(test_metrics["latent_p_value"] != 0):
         anomaly_score_pca = 1 - test_metrics["latent_p_value"]
-        fpr_pca, tpr_pca, _ = roc_curve(test_metrics["labels"], anomaly_score_pca)
+        fpr_pca, tpr_pca, thresholds_pca = roc_curve(test_metrics["labels"], anomaly_score_pca)
         auc_pca = roc_auc_score(test_metrics["labels"], anomaly_score_pca)
+        thresh_pca = test_metrics["thresh_latent_pca"]
+        idx_pca = np.argmin(np.abs(thresholds_pca - thresh_pca))
         plt.plot(fpr_pca, tpr_pca, label=f'Latent PCA p-value (AUC = {auc_pca:.3f})', linewidth=2)
+        plt.plot(fpr_pca[idx_pca], tpr_pca[idx_pca], 'co', markersize=8, label=f'PCA Threshold ({thresh_pca:.2f})')
 
-    plt.plot(fpr_elbo, tpr_elbo, label=f'Negative ELBO (AUC = {auc_elbo:.3f})', linewidth=2)
-    plt.plot(fpr_recon, tpr_recon, label=f'Reconstruction Error (AUC = {auc_recon:.3f})', linewidth=2)
-    plt.plot(fpr_latent, tpr_latent, label=f'Latent Energy (AUC = {auc_latent:.3f})', linewidth=2)
     plt.plot([0, 1], [0, 1], 'k--', label='Random Classifier')
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    plt.title('ROC Curves for Different Anomaly Detection Methods')
+    plt.title('ROC Curves with Optimal Thresholds')
     plt.legend()
     plt.grid(True)
     os.makedirs('diagrams', exist_ok=True)
@@ -202,4 +214,77 @@ def visualize_distribution_of_scores(test_metrics):
     plt.tight_layout()
     os.makedirs('diagrams', exist_ok=True)
     plt.savefig('diagrams/distribution_of_scores.png')
+    plt.close()
+
+def visualize_precision_recall_curves(test_metrics):
+    """ Визуализация Precision-Recall кривых """
+    plt.figure(figsize=(10, 8))
+
+    # Negative ELBO PR
+    precision_elbo, recall_elbo, _ = precision_recall_curve(test_metrics["labels"], test_metrics["neg_elbo"])
+    ap_elbo = average_precision_score(test_metrics["labels"], test_metrics["neg_elbo"])
+    plt.plot(recall_elbo, precision_elbo, label=f'Negative ELBO (AP = {ap_elbo:.3f})', linewidth=2)
+
+    # Reconstruction Error PR
+    precision_recon, recall_recon, _ = precision_recall_curve(test_metrics["labels"], test_metrics["recon_err"])
+    ap_recon = average_precision_score(test_metrics["labels"], test_metrics["recon_err"])
+    plt.plot(recall_recon, precision_recon, label=f'Reconstruction Error (AP = {ap_recon:.3f})', linewidth=2)
+
+    # Latent Energy PR
+    precision_latent, recall_latent, _ = precision_recall_curve(test_metrics["labels"], test_metrics["latent_energy"])
+    ap_latent = average_precision_score(test_metrics["labels"], test_metrics["latent_energy"])
+    plt.plot(recall_latent, precision_latent, label=f'Latent Energy (AP = {ap_latent:.3f})', linewidth=2)
+
+    # Latent PCA p-value PR
+    if "latent_p_value" in test_metrics and np.any(test_metrics["latent_p_value"] != 0):
+        anomaly_score_pca = 1 - test_metrics["latent_p_value"]
+        precision_pca, recall_pca, _ = precision_recall_curve(test_metrics["labels"], anomaly_score_pca)
+        ap_pca = average_precision_score(test_metrics["labels"], anomaly_score_pca)
+        plt.plot(recall_pca, precision_pca, label=f'Latent PCA p-value (AP = {ap_pca:.3f})', linewidth=2)
+
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('Precision-Recall Curves')
+    plt.legend()
+    plt.grid(True)
+    os.makedirs('diagrams', exist_ok=True)
+    plt.savefig('diagrams/precision_recall_curves.png')
+    plt.close()
+
+def visualize_confusion_matrices(test_metrics):
+    """ Визуализация confusion matrices для каждого детектора """
+    from sklearn.metrics import confusion_matrix
+    import seaborn as sns
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    axes = axes.ravel()
+
+    detectors = [
+        ('neg_elbo', 'Negative ELBO', test_metrics["thresh_elbo"]),
+        ('recon_err', 'Reconstruction Error', test_metrics["thresh_recon"]),
+        ('latent_energy', 'Latent Energy', test_metrics["thresh_latent"]),
+        ('latent_pca', 'Latent PCA', test_metrics["thresh_latent_pca"])
+    ]
+
+    for i, (key, name, thresh) in enumerate(detectors):
+        if key == 'latent_pca':
+            if "latent_p_value" in test_metrics and np.any(test_metrics["latent_p_value"] != 0):
+                scores = 1 - test_metrics["latent_p_value"]
+            else:
+                continue
+        else:
+            scores = test_metrics[key]
+
+        predictions = (scores >= thresh).astype(int)
+        cm = confusion_matrix(test_metrics["labels"], predictions)
+
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=axes[i],
+                    xticklabels=['Normal', 'Anomaly'], yticklabels=['Normal', 'Anomaly'])
+        axes[i].set_title(f'{name}\nThreshold: {thresh:.2f}')
+        axes[i].set_ylabel('True Label')
+        axes[i].set_xlabel('Predicted Label')
+
+    plt.tight_layout()
+    os.makedirs('diagrams', exist_ok=True)
+    plt.savefig('diagrams/confusion_matrices.png')
     plt.close()

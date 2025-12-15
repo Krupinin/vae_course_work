@@ -185,6 +185,39 @@ def evaluate_per_class(model, test_loader, alpha, pca=None, rv=None, log_lik_nor
 
     return results
 
+def compute_optimal_thresholds(labels, scores):
+    """
+    Compute optimal thresholds using Youden's J statistic (maximizing TPR - FPR).
+    Returns threshold and corresponding J value.
+    """
+    fpr, tpr, thresholds = roc_curve(labels, scores)
+    j_scores = tpr - fpr
+    best_idx = np.argmax(j_scores)
+    return thresholds[best_idx], j_scores[best_idx]
+
+def compute_classification_metrics(labels, scores, threshold):
+    """
+    Compute precision, recall, F1-score, accuracy for given threshold.
+    """
+    predictions = (scores >= threshold).astype(int)
+    tp = np.sum((predictions == 1) & (labels == 1))
+    tn = np.sum((predictions == 0) & (labels == 0))
+    fp = np.sum((predictions == 1) & (labels == 0))
+    fn = np.sum((predictions == 0) & (labels == 1))
+
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+    accuracy = (tp + tn) / len(labels)
+
+    return {
+        'precision': precision,
+        'recall': recall,
+        'f1': f1,
+        'accuracy': accuracy,
+        'tp': tp, 'tn': tn, 'fp': fp, 'fn': fn
+    }
+
 def evaluate(model, loader, alpha, split_name="val", val_loader=None):
     # Prepare latent density model if val_loader provided
     if val_loader is not None:
@@ -206,6 +239,24 @@ def evaluate(model, loader, alpha, split_name="val", val_loader=None):
     ap_latent = average_precision_score(labels, latent_energy)
     ap_latent_pca = average_precision_score(labels, 1 - latent_p_value) if np.any(latent_p_value != 0) else 0.5
     print(f"[{split_name}] AP (recon): {ap_recon:.4f} | AP (ELBO): {ap_elbo:.4f} | AP (latent): {ap_latent:.4f} | AP (latent PCA): {ap_latent_pca:.4f}")
+
+    # Compute optimal thresholds
+    thresh_recon, _ = compute_optimal_thresholds(labels, recon_err)
+    thresh_elbo, _ = compute_optimal_thresholds(labels, neg_elbo)
+    thresh_latent, _ = compute_optimal_thresholds(labels, latent_energy)
+    # For latent PCA, use fixed threshold: p-value <= 0.05 corresponds to anomaly_score > 0.95
+    thresh_latent_pca = 0.95  # since anomaly_score = 1 - p_value, and p_value <= 0.05 -> score > 0.95
+
+    # Compute classification metrics for each detector
+    metrics_recon = compute_classification_metrics(labels, recon_err, thresh_recon)
+    metrics_elbo = compute_classification_metrics(labels, neg_elbo, thresh_elbo)
+    metrics_latent = compute_classification_metrics(labels, latent_energy, thresh_latent)
+    anomaly_score_pca = 1 - latent_p_value if np.any(latent_p_value != 0) else np.zeros_like(latent_energy)
+    metrics_latent_pca = compute_classification_metrics(labels, anomaly_score_pca, thresh_latent_pca)
+
+    print(f"[{split_name}] Thresholds - Recon: {thresh_recon:.4f}, ELBO: {thresh_elbo:.4f}, Latent: {thresh_latent:.4f}, PCA: {thresh_latent_pca:.4f}")
+    print(f"[{split_name}] F1 Scores - Recon: {metrics_recon['f1']:.4f}, ELBO: {metrics_elbo['f1']:.4f}, Latent: {metrics_latent['f1']:.4f}, PCA: {metrics_latent_pca['f1']:.4f}")
+
     return {
         "labels": labels,
         "recon_err": recon_err,
@@ -215,5 +266,13 @@ def evaluate(model, loader, alpha, split_name="val", val_loader=None):
         "auc_recon": auc_recon,
         "auc_elbo": auc_elbo,
         "auc_latent": auc_latent,
-        "auc_latent_pca": auc_latent_pca
+        "auc_latent_pca": auc_latent_pca,
+        "thresh_recon": thresh_recon,
+        "thresh_elbo": thresh_elbo,
+        "thresh_latent": thresh_latent,
+        "thresh_latent_pca": thresh_latent_pca,
+        "metrics_recon": metrics_recon,
+        "metrics_elbo": metrics_elbo,
+        "metrics_latent": metrics_latent,
+        "metrics_latent_pca": metrics_latent_pca
     }

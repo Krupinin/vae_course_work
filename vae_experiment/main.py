@@ -8,7 +8,7 @@ from data import train_loader, val_loader, test_loader
 from model import ConvVAE
 from train import train_epoch
 from evaluate import compute_mse_kl_stats, evaluate, evaluate_per_class
-from visualisation import visulize_model_recon_examples, visualize_ROC_curves, visualize_per_class_auc, visualize_latent_space, visualize_distribution_of_scores
+from visualisation import visulize_model_recon_examples, visualize_ROC_curves, visualize_per_class_auc, visualize_latent_space, visualize_distribution_of_scores, visualize_precision_recall_curves, visualize_confusion_matrices
 import torch
 import os
 
@@ -142,6 +142,8 @@ def main():
     test_results = evaluate(trained_model, test_loader, optimal_alpha, split_name="test", val_loader=val_loader)
     visualize_ROC_curves(test_results)
     visualize_distribution_of_scores(test_results)
+    visualize_precision_recall_curves(test_results)
+    visualize_confusion_matrices(test_results)
 
     print_in_frame("Step 4: Per-class evaluation")
     # Prepare PCA model once for per-class evaluation
