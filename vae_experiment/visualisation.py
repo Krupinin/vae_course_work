@@ -63,10 +63,13 @@ def visualize_per_class_auc(per_class_results):
     auc_elbo = [per_class_results[c]['auc_elbo'] for c in classes]
     auc_latent = [per_class_results[c]['auc_latent'] for c in classes]
 
+    # FashionMNIST class names
+    class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
+
     x = np.arange(len(classes))
     width = 0.25
 
-    fig, ax = plt.subplots(figsize=(12,6))
+    fig, ax = plt.subplots(figsize=(14,8))
     ax.bar(x - width, auc_recon, width, label='Recon Error AUC', alpha=0.8)
     ax.bar(x, auc_elbo, width, label='Neg ELBO AUC', alpha=0.8)
     ax.bar(x + width, auc_latent, width, label='Latent Energy AUC', alpha=0.8)
@@ -75,7 +78,7 @@ def visualize_per_class_auc(per_class_results):
     ax.set_ylabel('AUC Score')
     ax.set_title('AUC for Distinguishing Sweater (Class 2) from Each Anomalous Class')
     ax.set_xticks(x)
-    ax.set_xticklabels([f'Class {c}' for c in classes])
+    ax.set_xticklabels([f'{c}: {class_names[c]}' for c in classes], rotation=45, ha='right')
     ax.legend()
     ax.grid(True, axis='y')
     ax.set_ylim(0, 1)

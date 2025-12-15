@@ -89,13 +89,35 @@ def train_full_model(optimal_alpha):
 
     return model
 
-def main():
-    print("Starting VAE training with optimal alpha search...")
+def print_in_frame(text, frame_char="#", padding=1):
+    """ Форматирование строк вывода. Вывод в рамке. """
+    print("\n")
+    lines = text.split('\n')    
+    max_length = max(len(line) for line in lines)
+    border = frame_char * (max_length + 2 * padding + 2)
+    print(border)
+    if padding > 0:
+        empty_line = frame_char + ' ' * (max_length + 2 * padding) + frame_char
+        for _ in range(padding):
+            print(empty_line)
+    for line in lines:
+        spaces_needed = max_length - len(line)
+        line_with_padding = ' ' * padding + line + ' ' * (spaces_needed + padding)
+        print(f"{frame_char}{line_with_padding}{frame_char}")
+    if padding > 0:
+        for _ in range(padding):
+            print(empty_line)
+    print(border)
+    print("\n")
 
-    # Step 1: Find optimal alpha
+def main():
+
+    print_in_frame("Step 1: Find optimal alpha")
     # optimal_alpha = find_optimal_alpha()
     optimal_alpha = 0.25
+    print(f"optimal_alpha: {optimal_alpha}")
 
+    print_in_frame("Step 2: Train full model with optimal alpha")
     final_save_path = f"vae_experiment/model_optimal_alpha_{optimal_alpha}.pth"
 
     # Check if model already exists
@@ -105,21 +127,19 @@ def main():
         model.load_state_dict(torch.load(final_save_path))
         trained_model = model
     else:
-        # Step 2: Train full model with optimal alpha
+        # Train full model with optimal alpha
         trained_model = train_full_model(optimal_alpha)
 
-        # Step 3: Save final model
+        # Save final model
         os.makedirs(os.path.dirname(final_save_path), exist_ok=True)
         torch.save(trained_model.state_dict(), final_save_path)
         print(f"Final model saved to {final_save_path}")
 
-    # Step 4: Evaluate on test set
-    print("\n--- Evaluation on Test Set ---")
+    print_in_frame("Step 3: Evaluate on test set")
     test_results = evaluate(trained_model, test_loader, optimal_alpha, split_name="test")
     visualize_ROC_curves(test_results)
 
-    # Step 5: Per-class evaluation
-    print("\n--- Per-Class Evaluation ---")
+    print_in_frame("Step 4: Per-class evaluation")
     per_class_results = evaluate_per_class(trained_model, test_loader, optimal_alpha)
     for c, res in sorted(per_class_results.items()):
         print(f"Class {c}: AUC recon {res['auc_recon']:.4f}, ELBO {res['auc_elbo']:.4f}, Latent {res['auc_latent']:.4f} (n={res['n_samples']})")
