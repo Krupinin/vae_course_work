@@ -2,13 +2,14 @@ import matplotlib.pyplot as plt
 from torchvision import utils
 import torch
 import os
+import numpy as np
 from data import test_loader, val_loader
 from config import *
 from sklearn.metrics import roc_auc_score, roc_curve
-
+from sklearn.decomposition import PCA
 
 def visulize_model_recon_examples(model):
-    # Распечатать несколько примеров реконструкции (нормальные и аномальные)
+    """ Несколько примеров реконструкции (нормальные и аномальные) """
     model.eval()
     x_batch, y_batch = next(iter(test_loader))
     x_batch = x_batch.to(device)
@@ -29,6 +30,7 @@ def visulize_model_recon_examples(model):
     plt.close()
 
 def visualize_ROC_curves(test_metrics):
+    """ Визуализация ROC кривых """
     plt.figure(figsize=(10, 8))
 
     # Negative ELBO ROC
@@ -57,7 +59,6 @@ def visualize_ROC_curves(test_metrics):
     plt.close()
 
 def visualize_per_class_auc(per_class_results):
-    import numpy as np
     classes = sorted(per_class_results.keys())
     auc_recon = [per_class_results[c]['auc_recon'] for c in classes]
     auc_elbo = [per_class_results[c]['auc_elbo'] for c in classes]
@@ -88,7 +89,7 @@ def visualize_per_class_auc(per_class_results):
     plt.close()
 
 def visualize_latent_space(model):
-    # 4. Визуализация латентного пространства (2D проекция)
+    """ Визуализация латентного пространства (2D проекция) """
     if latent_dim >= 2:
         model.eval()
         latents = []
@@ -105,18 +106,22 @@ def visualize_latent_space(model):
         labels_list = np.concatenate(labels_list)
 
         # Используем PCA для визуализации многомерного пространства
-        from sklearn.decomposition import PCA
         pca = PCA(n_components=2)
         latents_2d = pca.fit_transform(latents)
 
+        # FashionMNIST class names
+        class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
+
+        colors = plt.cm.tab10(np.linspace(0, 1, 10)) # Colors for each class
+
         plt.figure(figsize=(10, 8))
-        scatter = plt.scatter(latents_2d[:, 0], latents_2d[:, 1],
-                            c=labels_list, cmap='coolwarm', alpha=0.6)
-        plt.colorbar(scatter, label='Class (0=Normal, 1=Anomaly)')
+        for i in range(10):
+            mask = labels_list == i
+            plt.scatter(latents_2d[mask, 0], latents_2d[mask, 1], color=colors[i], label=class_names[i], alpha=0.6)
         plt.xlabel('First Principal Component')
         plt.ylabel('Second Principal Component')
         plt.title('2D Projection of Latent Space (PCA)')
-        # plt.show()
+        plt.legend(loc='upper right')
         os.makedirs('diagrams', exist_ok=True)
         plt.savefig('diagrams/latent_space.png')
         plt.close()
