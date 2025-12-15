@@ -8,7 +8,7 @@ from data import train_loader, val_loader, test_loader
 from model import ConvVAE
 from train import train_epoch
 from evaluate import compute_mse_kl_stats, evaluate
-from visualisation import visulize_model_recon_examples
+from visualisation import visulize_model_recon_examples, visualize_ROC_curves
 import torch
 import os
 
@@ -116,7 +116,7 @@ def main():
     # Step 4: Evaluate on test set
     print("\n--- Evaluation on Test Set ---")
     test_results = evaluate(trained_model, test_loader, optimal_alpha, split_name="test")
-
+    visualize_ROC_curves(test_results)
 
 if __name__ == '__main__':
     main()
