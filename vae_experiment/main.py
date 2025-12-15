@@ -106,7 +106,7 @@ def main():
 
     # Step 4: Evaluate on test set
     print("\n--- Evaluation on Test Set ---")
-    test_results = evaluate(test_loader, optimal_alpha, split_name="test")
+    test_results = evaluate(trained_model, test_loader, optimal_alpha, split_name="test")
 
     # # Step 5: Visualize reconstructions
     # print("\n--- Visualizing Reconstructions ---")

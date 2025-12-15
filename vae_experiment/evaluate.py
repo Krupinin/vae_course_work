@@ -34,7 +34,7 @@ def compute_mse_kl_stats(loader, model, alpha):
     }
 
 @torch.no_grad()
-def compute_scores(loader, alpha):
+def compute_scores(model, loader, alpha):
     model.eval()
     all_labels = []
     recon_errors = []
@@ -74,8 +74,8 @@ def compute_scores(loader, alpha):
     return all_labels, recon_errors, neg_elbos, latent_neg_logp
 
 
-def evaluate(loader, alpha, split_name="val"):
-    labels, recon_err, neg_elbo, latent_energy = compute_scores(loader, alpha)
+def evaluate(model, loader, alpha, split_name="val"):
+    labels, recon_err, neg_elbo, latent_energy = compute_scores(model, loader, alpha)
     # For each score we compute AUC (higher score = more anomalous)
     auc_recon = roc_auc_score(labels, recon_err)
     auc_elbo  = roc_auc_score(labels, neg_elbo)
