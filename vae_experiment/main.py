@@ -1,22 +1,16 @@
-"""
-Main script to train VAE with optimal alpha coefficient.
-First finds optimal alpha through experimentation, then trains full model.
-"""
+""" Основной скрипт запуска проекта. """
 
 from config import *
 from data import train_loader, val_loader, test_loader
 from model import ConvVAE
 from train import train_epoch
-from evaluate import compute_mse_kl_stats, evaluate, evaluate_per_class
+from evaluate import compute_mse_kl_stats, evaluate, evaluate_per_class, prepare_latent_density_model
 from visualisation import visulize_model_recon_examples, visualize_ROC_curves, visualize_per_class_auc, visualize_latent_space, visualize_distribution_of_scores, visualize_precision_recall_curves, visualize_confusion_matrices
 import torch
 import os
 
 def find_optimal_alpha(alpha_values=None, epoch_fraction=10):
-    """
-    Find optimal alpha by testing different values on reduced training.
-    Returns the optimal alpha value.
-    """
+    """ Находит оптимальную alpha тестируя разные значения """
     if alpha_values is None:
         alpha_values = [0.18, 0.2, 0.25]  # Default test values
 
@@ -64,8 +58,8 @@ def find_optimal_alpha(alpha_values=None, epoch_fraction=10):
 
 def train_full_model(optimal_alpha):
     """
-    Train the VAE model with optimal alpha for full num_epochs.
-    Returns the trained model.
+    Обучает полную модель VAE с оптимальным значением альфа.
+    Возвращает обученную модель.
     """
     print(f"\n--- Full Training with optimal alpha = {optimal_alpha} ---")
 
@@ -111,7 +105,6 @@ def print_in_frame(text, frame_char="#", padding=1):
     print("\n")
 
 def main():
-
     print_in_frame("Step 1: Find optimal alpha")
     # optimal_alpha = find_optimal_alpha()
     optimal_alpha = 0.25
@@ -147,7 +140,6 @@ def main():
 
     print_in_frame("Step 4: Per-class evaluation")
     # Prepare PCA model once for per-class evaluation
-    from evaluate import prepare_latent_density_model
     pca, rv, log_lik_normal = prepare_latent_density_model(trained_model, val_loader)
     per_class_results = evaluate_per_class(trained_model, test_loader, optimal_alpha, pca, rv, log_lik_normal)
     for c, res in sorted(per_class_results.items()):

@@ -1,13 +1,8 @@
+""" Вариационный автокодировщик """
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from config import latent_dim
-
-#############################
-#############################
-# Вариационный автокодировщик
-#############################
-#############################
 
 class ConvEncoder(nn.Module):
     def __init__(self, latent_dim):

@@ -5,8 +5,9 @@ import os
 import numpy as np
 from data import test_loader, val_loader
 from config import *
-from sklearn.metrics import roc_auc_score, roc_curve, precision_recall_curve, average_precision_score
+from sklearn.metrics import roc_auc_score, roc_curve, precision_recall_curve, average_precision_score, confusion_matrix
 from sklearn.decomposition import PCA
+import seaborn as sns
 
 def visulize_model_recon_examples(model):
     """ Несколько примеров реконструкции (нормальные и аномальные) """
@@ -253,9 +254,6 @@ def visualize_precision_recall_curves(test_metrics):
 
 def visualize_confusion_matrices(test_metrics):
     """ Визуализация confusion matrices для каждого детектора """
-    from sklearn.metrics import confusion_matrix
-    import seaborn as sns
-
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
     axes = axes.ravel()
 

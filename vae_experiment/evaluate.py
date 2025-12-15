@@ -1,3 +1,4 @@
+""" Оценка производительности модели Variational Autoencoder (VAE) """
 import numpy as np
 from sklearn.metrics import roc_auc_score, roc_curve, precision_recall_curve, average_precision_score
 from sklearn.decomposition import PCA
@@ -5,12 +6,6 @@ from scipy.stats import multivariate_normal
 import torch
 from losses import recon_mse, kl_divergence
 from config import class_idx, device
-
-#############################
-#############################
-# Оценка
-#############################
-#############################
 
 @torch.no_grad()
 def compute_mse_kl_stats(loader, model, alpha):
