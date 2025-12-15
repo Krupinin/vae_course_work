@@ -74,6 +74,62 @@ def compute_scores(model, loader, alpha):
     return all_labels, recon_errors, neg_elbos, latent_neg_logp
 
 
+def evaluate_per_class(model, test_loader, alpha):
+    """
+    Evaluate model's ability to distinguish training class (class_idx) from each other class.
+    Returns dict with AUC for each anomalous class.
+    """
+    model.eval()
+
+    # Collect all test data
+    all_x, all_y = [], []
+    for x, y in test_loader:
+        all_x.append(x)
+        all_y.append(y)
+    all_x = torch.cat(all_x)
+    all_y = torch.cat(all_y)
+
+    results = {}
+    for c in range(10):
+        if c == class_idx:
+            continue
+
+        # Filter for class_idx and c
+        mask = (all_y == class_idx) | (all_y == c)
+        x_subset = all_x[mask]
+        y_subset = all_y[mask]
+
+        if len(x_subset) == 0:
+            continue
+
+        # Compute scores
+        x_subset = x_subset.to(device)
+        with torch.no_grad():
+            recon_x, mu, logvar, z = model(x_subset)
+
+        rec_err = recon_mse(recon_x, x_subset).cpu().numpy()
+        kl = kl_divergence(mu, logvar).cpu().numpy()
+        neg_elbo = rec_err + alpha * kl
+        z_np = z.cpu().numpy()
+        energy = 0.5 * np.sum(z_np**2, axis=1)
+
+        # Labels: 1 for anomalous (c), 0 for normal (class_idx)
+        labels = (y_subset.numpy() == c).astype(int)
+
+        # Compute AUC
+        auc_recon = roc_auc_score(labels, rec_err)
+        auc_elbo = roc_auc_score(labels, neg_elbo)
+        auc_latent = roc_auc_score(labels, energy)
+
+        results[c] = {
+            'auc_recon': auc_recon,
+            'auc_elbo': auc_elbo,
+            'auc_latent': auc_latent,
+            'n_samples': len(labels)
+        }
+
+    return results
+
 def evaluate(model, loader, alpha, split_name="val"):
     labels, recon_err, neg_elbo, latent_energy = compute_scores(model, loader, alpha)
     # For each score we compute AUC (higher score = more anomalous)

@@ -55,3 +55,31 @@ def visualize_ROC_curves(test_metrics):
     os.makedirs('diagrams', exist_ok=True)
     plt.savefig('diagrams/roc_curves.png')
     plt.close()
+
+def visualize_per_class_auc(per_class_results):
+    import numpy as np
+    classes = sorted(per_class_results.keys())
+    auc_recon = [per_class_results[c]['auc_recon'] for c in classes]
+    auc_elbo = [per_class_results[c]['auc_elbo'] for c in classes]
+    auc_latent = [per_class_results[c]['auc_latent'] for c in classes]
+
+    x = np.arange(len(classes))
+    width = 0.25
+
+    fig, ax = plt.subplots(figsize=(12,6))
+    ax.bar(x - width, auc_recon, width, label='Recon Error AUC', alpha=0.8)
+    ax.bar(x, auc_elbo, width, label='Neg ELBO AUC', alpha=0.8)
+    ax.bar(x + width, auc_latent, width, label='Latent Energy AUC', alpha=0.8)
+
+    ax.set_xlabel('Anomalous Class')
+    ax.set_ylabel('AUC Score')
+    ax.set_title('AUC for Distinguishing Sweater (Class 2) from Each Anomalous Class')
+    ax.set_xticks(x)
+    ax.set_xticklabels([f'Class {c}' for c in classes])
+    ax.legend()
+    ax.grid(True, axis='y')
+    ax.set_ylim(0, 1)
+    plt.tight_layout()
+    os.makedirs('diagrams', exist_ok=True)
+    plt.savefig('diagrams/per_class_auc.png')
+    plt.close()
