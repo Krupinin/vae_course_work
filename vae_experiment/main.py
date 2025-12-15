@@ -8,7 +8,6 @@ from data import train_loader, val_loader, test_loader
 from model import ConvVAE
 from train import train_epoch
 from evaluate import compute_mse_kl_stats, evaluate
-from visualization import plot_reconstructions
 import torch
 import os
 
@@ -84,7 +83,25 @@ def train_full_model(optimal_alpha):
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
             torch.save(model.state_dict(), save_path)
             print(f"Model saved at epoch {epoch}")
-
+            
+    import matplotlib.pyplot as plt
+    # Распечатать несколько примеров реконструкции (нормальные и аномальные)
+    model.eval()
+    x_batch, y_batch = next(iter(test_loader))
+    x_batch = x_batch.to(device)
+    with torch.no_grad():
+        recon_x, mu, logvar, z = model(x_batch)
+    # Выберем первые 8 изображений и покажем оригинал/реконструкцию
+    n_show = 8
+    orig = x_batch[:n_show].cpu()
+    recon = recon_x[:n_show].cpu()
+    grid = torch.cat([orig, recon], dim=0)
+    grid_img = utils.make_grid(grid, nrow=n_show, pad_value=1.0)
+    plt.figure(figsize=(12,4))
+    plt.title("Top row: original (first 8) | Bottom row: reconstructions")
+    plt.axis('off')
+    plt.imshow(grid_img.permute(1,2,0).squeeze(), cmap='gray')
+    plt.show()
     return model
 
 def main():
@@ -94,25 +111,27 @@ def main():
     # optimal_alpha = find_optimal_alpha()
     optimal_alpha = 0.25
 
-    # Step 2: Train full model with optimal alpha
-    trained_model = train_full_model(optimal_alpha)
-
-    # Step 3: Save final model
     final_save_path = f"vae_experiment/model_optimal_alpha_{optimal_alpha}.pth"
-    os.makedirs(os.path.dirname(final_save_path), exist_ok=True)
-    torch.save(trained_model.state_dict(), final_save_path)
-    print(f"Final model saved to {final_save_path}")
 
+    # Check if model already exists
+    if os.path.exists(final_save_path):
+        print(f"Model already exists at {final_save_path}, loading...")
+        model = ConvVAE(latent_dim).to(device)
+        model.load_state_dict(torch.load(final_save_path))
+        trained_model = model
+    else:
+        # Step 2: Train full model with optimal alpha
+        trained_model = train_full_model(optimal_alpha)
+
+        # Step 3: Save final model
+        os.makedirs(os.path.dirname(final_save_path), exist_ok=True)
+        torch.save(trained_model.state_dict(), final_save_path)
+        print(f"Final model saved to {final_save_path}")
 
     # Step 4: Evaluate on test set
     print("\n--- Evaluation on Test Set ---")
     test_results = evaluate(trained_model, test_loader, optimal_alpha, split_name="test")
 
-    # # Step 5: Visualize reconstructions
-    # print("\n--- Visualizing Reconstructions ---")
-    # plot_reconstructions(trained_model, test_loader)
-
-    # print("Training and evaluation complete!")
 
 if __name__ == '__main__':
     main()
