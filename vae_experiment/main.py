@@ -8,6 +8,7 @@ from data import train_loader, val_loader, test_loader
 from model import ConvVAE
 from train import train_epoch
 from evaluate import compute_mse_kl_stats, evaluate
+from visualisation import visulize_model_recon_examples
 import torch
 import os
 
@@ -83,25 +84,9 @@ def train_full_model(optimal_alpha):
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
             torch.save(model.state_dict(), save_path)
             print(f"Model saved at epoch {epoch}")
-            
-    import matplotlib.pyplot as plt
-    # Распечатать несколько примеров реконструкции (нормальные и аномальные)
-    model.eval()
-    x_batch, y_batch = next(iter(test_loader))
-    x_batch = x_batch.to(device)
-    with torch.no_grad():
-        recon_x, mu, logvar, z = model(x_batch)
-    # Выберем первые 8 изображений и покажем оригинал/реконструкцию
-    n_show = 8
-    orig = x_batch[:n_show].cpu()
-    recon = recon_x[:n_show].cpu()
-    grid = torch.cat([orig, recon], dim=0)
-    grid_img = utils.make_grid(grid, nrow=n_show, pad_value=1.0)
-    plt.figure(figsize=(12,4))
-    plt.title("Top row: original (first 8) | Bottom row: reconstructions")
-    plt.axis('off')
-    plt.imshow(grid_img.permute(1,2,0).squeeze(), cmap='gray')
-    plt.show()
+
+    visulize_model_recon_examples(model)
+
     return model
 
 def main():
