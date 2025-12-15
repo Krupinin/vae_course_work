@@ -139,14 +139,17 @@ def main():
     visualize_latent_space(trained_model)
 
     print_in_frame("Step 3: Evaluate on test set")
-    test_results = evaluate(trained_model, test_loader, optimal_alpha, split_name="test")
+    test_results = evaluate(trained_model, test_loader, optimal_alpha, split_name="test", val_loader=val_loader)
     visualize_ROC_curves(test_results)
     visualize_distribution_of_scores(test_results)
 
     print_in_frame("Step 4: Per-class evaluation")
-    per_class_results = evaluate_per_class(trained_model, test_loader, optimal_alpha)
+    # Prepare PCA model once for per-class evaluation
+    from evaluate import prepare_latent_density_model
+    pca, rv, log_lik_normal = prepare_latent_density_model(trained_model, val_loader)
+    per_class_results = evaluate_per_class(trained_model, test_loader, optimal_alpha, pca, rv, log_lik_normal)
     for c, res in sorted(per_class_results.items()):
-        print(f"Class {c}: AUC recon {res['auc_recon']:.4f}, ELBO {res['auc_elbo']:.4f}, Latent {res['auc_latent']:.4f} (n={res['n_samples']})")
+        print(f"Class {c}: AUC recon {res['auc_recon']:.4f}, ELBO {res['auc_elbo']:.4f}, Latent {res['auc_latent']:.4f}, Latent PCA {res['auc_latent_pca']:.4f} (n={res['n_samples']})")
     visualize_per_class_auc(per_class_results)
 
 if __name__ == '__main__':

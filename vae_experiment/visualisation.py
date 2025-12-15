@@ -45,6 +45,13 @@ def visualize_ROC_curves(test_metrics):
     fpr_latent, tpr_latent, _ = roc_curve(test_metrics["labels"], test_metrics["latent_energy"])
     auc_latent = roc_auc_score(test_metrics["labels"], test_metrics["latent_energy"])
 
+    # Latent PCA p-value ROC (higher anomaly score = more anomalous)
+    if "latent_p_value" in test_metrics and np.any(test_metrics["latent_p_value"] != 0):
+        anomaly_score_pca = 1 - test_metrics["latent_p_value"]
+        fpr_pca, tpr_pca, _ = roc_curve(test_metrics["labels"], anomaly_score_pca)
+        auc_pca = roc_auc_score(test_metrics["labels"], anomaly_score_pca)
+        plt.plot(fpr_pca, tpr_pca, label=f'Latent PCA p-value (AUC = {auc_pca:.3f})', linewidth=2)
+
     plt.plot(fpr_elbo, tpr_elbo, label=f'Negative ELBO (AUC = {auc_elbo:.3f})', linewidth=2)
     plt.plot(fpr_recon, tpr_recon, label=f'Reconstruction Error (AUC = {auc_recon:.3f})', linewidth=2)
     plt.plot(fpr_latent, tpr_latent, label=f'Latent Energy (AUC = {auc_latent:.3f})', linewidth=2)
@@ -63,17 +70,19 @@ def visualize_per_class_auc(per_class_results):
     auc_recon = [per_class_results[c]['auc_recon'] for c in classes]
     auc_elbo = [per_class_results[c]['auc_elbo'] for c in classes]
     auc_latent = [per_class_results[c]['auc_latent'] for c in classes]
+    auc_latent_pca = [per_class_results[c]['auc_latent_pca'] for c in classes]
 
     # FashionMNIST class names
     class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
 
     x = np.arange(len(classes))
-    width = 0.25
+    width = 0.2
 
     fig, ax = plt.subplots(figsize=(14,8))
-    ax.bar(x - width, auc_recon, width, label='Recon Error AUC', alpha=0.8)
-    ax.bar(x, auc_elbo, width, label='Neg ELBO AUC', alpha=0.8)
-    ax.bar(x + width, auc_latent, width, label='Latent Energy AUC', alpha=0.8)
+    ax.bar(x - 1.5*width, auc_recon, width, label='Recon Error AUC', alpha=0.8)
+    ax.bar(x - 0.5*width, auc_elbo, width, label='Neg ELBO AUC', alpha=0.8)
+    ax.bar(x + 0.5*width, auc_latent, width, label='Latent Energy AUC', alpha=0.8)
+    ax.bar(x + 1.5*width, auc_latent_pca, width, label='Latent PCA AUC', alpha=0.8)
 
     ax.set_xlabel('Anomalous Class')
     ax.set_ylabel('AUC Score')
@@ -128,10 +137,10 @@ def visualize_latent_space(model):
 
 def visualize_distribution_of_scores(test_metrics):
     """ График распределения скоров для нормальных и аномальных примеров """
-    plt.figure(figsize=(12, 4))
+    plt.figure(figsize=(16, 4))
 
     # Negative ELBO
-    plt.subplot(1, 3, 1)
+    plt.subplot(1, 4, 1)
     normal_scores = test_metrics["neg_elbo"][test_metrics["labels"] == 0]
     anomaly_scores = test_metrics["neg_elbo"][test_metrics["labels"] == 1]
     plt.hist(normal_scores, bins=50, alpha=0.7, label='Normal', color='blue')
@@ -146,7 +155,7 @@ def visualize_distribution_of_scores(test_metrics):
     plt.legend()
 
     # Reconstruction Error
-    plt.subplot(1, 3, 2)
+    plt.subplot(1, 4, 2)
     normal_scores = test_metrics["recon_err"][test_metrics["labels"] == 0]
     anomaly_scores = test_metrics["recon_err"][test_metrics["labels"] == 1]
     plt.hist(normal_scores, bins=50, alpha=0.7, label='Normal', color='blue')
@@ -161,7 +170,7 @@ def visualize_distribution_of_scores(test_metrics):
     plt.legend()
 
     # Latent Energy
-    plt.subplot(1, 3, 3)
+    plt.subplot(1, 4, 3)
     normal_scores = test_metrics["latent_energy"][test_metrics["labels"] == 0]
     anomaly_scores = test_metrics["latent_energy"][test_metrics["labels"] == 1]
     plt.hist(normal_scores, bins=50, alpha=0.7, label='Normal', color='blue')
@@ -174,6 +183,21 @@ def visualize_distribution_of_scores(test_metrics):
     plt.ylabel('Frequency')
     plt.title('Distribution of Latent Energy')
     plt.legend()
+
+    # Latent PCA Anomaly Score (1 - p_value)
+    if "latent_p_value" in test_metrics and np.any(test_metrics["latent_p_value"] != 0):
+        plt.subplot(1, 4, 4)
+        anomaly_score_pca = 1 - test_metrics["latent_p_value"]
+        normal_scores = anomaly_score_pca[test_metrics["labels"] == 0]
+        anomaly_scores = anomaly_score_pca[test_metrics["labels"] == 1]
+        plt.hist(normal_scores, bins=50, alpha=0.7, label='Normal', color='blue')
+        plt.hist(anomaly_scores, bins=50, alpha=0.7, label='Anomaly', color='red')
+        # Threshold at 1 - 0.05 = 0.95 (since p_value < 0.05 -> anomaly_score > 0.95)
+        plt.axvline(x=0.95, color='black', linestyle='--', label='Threshold: 0.95')
+        plt.xlabel('Latent PCA Anomaly Score (1 - p-value)')
+        plt.ylabel('Frequency')
+        plt.title('Distribution of Latent PCA Anomaly Scores')
+        plt.legend()
 
     plt.tight_layout()
     os.makedirs('diagrams', exist_ok=True)

@@ -1,5 +1,7 @@
 import numpy as np
 from sklearn.metrics import roc_auc_score, roc_curve, precision_recall_curve, average_precision_score
+from sklearn.decomposition import PCA
+from scipy.stats import multivariate_normal
 import torch
 from losses import recon_mse, kl_divergence
 from config import class_idx, device
@@ -34,12 +36,44 @@ def compute_mse_kl_stats(loader, model, alpha):
     }
 
 @torch.no_grad()
-def compute_scores(model, loader, alpha):
+def prepare_latent_density_model(model, val_loader):
+    """
+    Prepare PCA and multivariate gaussian model for latent space density.
+    Returns PCA, multivariate_normal, and log_likelihoods for normal validation samples.
+    """
+    model.eval()
+    latents = []
+    with torch.no_grad():
+        for x, y in val_loader:
+            x = x.to(device)
+            _, _, _, z = model(x)
+            # Only normal samples (y == class_idx)
+            mask = y == class_idx
+            latents.append(z[mask].cpu().numpy())
+    latents = np.concatenate(latents)
+
+    # PCA to 2D
+    pca = PCA(n_components=2)
+    latents_2d = pca.fit_transform(latents)
+
+    # Fit multivariate gaussian
+    mean = np.mean(latents_2d, axis=0)
+    cov = np.cov(latents_2d.T)
+    rv = multivariate_normal(mean=mean, cov=cov)
+
+    # Log likelihoods for normal samples
+    log_lik_normal = rv.logpdf(latents_2d)
+
+    return pca, rv, log_lik_normal
+
+@torch.no_grad()
+def compute_scores(model, loader, alpha, pca=None, rv=None, log_lik_normal=None):
     model.eval()
     all_labels = []
     recon_errors = []
     neg_elbos = []
     latent_neg_logp = []
+    latent_p_value = []
 
     for x, y in loader:
         x = x.to(device)
@@ -58,6 +92,16 @@ def compute_scores(model, loader, alpha):
         z_np = z.cpu().numpy()
         energy = 0.5 * np.sum(z_np**2, axis=1)
 
+        # --- latent 2D PCA log likelihood p-value ---
+        if pca is not None and rv is not None and log_lik_normal is not None:
+            latent_2d = pca.transform(z_np)
+            latent_log_lik = rv.logpdf(latent_2d)
+            # p_value: fraction of normal samples with log_lik <= this (lower = more anomalous)
+            p_values = np.array([np.sum(log_lik_normal <= lik) / len(log_lik_normal) for lik in latent_log_lik])
+            latent_p_value.append(p_values)
+        else:
+            latent_p_value.append(np.zeros_like(energy))  # placeholder
+
         # define anomaly label
         label = (y.numpy() != class_idx).astype(int)
 
@@ -70,11 +114,12 @@ def compute_scores(model, loader, alpha):
     recon_errors = np.concatenate(recon_errors)
     neg_elbos = np.concatenate(neg_elbos)
     latent_neg_logp = np.concatenate(latent_neg_logp)
+    latent_p_value = np.concatenate(latent_p_value)
 
-    return all_labels, recon_errors, neg_elbos, latent_neg_logp
+    return all_labels, recon_errors, neg_elbos, latent_neg_logp, latent_p_value
 
 
-def evaluate_per_class(model, test_loader, alpha):
+def evaluate_per_class(model, test_loader, alpha, pca=None, rv=None, log_lik_normal=None):
     """
     Evaluate model's ability to distinguish training class (class_idx) from each other class.
     Returns dict with AUC for each anomalous class.
@@ -113,6 +158,15 @@ def evaluate_per_class(model, test_loader, alpha):
         z_np = z.cpu().numpy()
         energy = 0.5 * np.sum(z_np**2, axis=1)
 
+        # Compute p_values if available
+        if pca is not None and rv is not None and log_lik_normal is not None:
+            latent_2d = pca.transform(z_np)
+            latent_log_lik = rv.logpdf(latent_2d)
+            p_values = np.array([np.sum(log_lik_normal <= lik) / len(log_lik_normal) for lik in latent_log_lik])
+            auc_latent_pca = roc_auc_score((y_subset.numpy() == c).astype(int), 1 - p_values)
+        else:
+            auc_latent_pca = 0.5
+
         # Labels: 1 for anomalous (c), 0 for normal (class_idx)
         labels = (y_subset.numpy() == c).astype(int)
 
@@ -125,29 +179,41 @@ def evaluate_per_class(model, test_loader, alpha):
             'auc_recon': auc_recon,
             'auc_elbo': auc_elbo,
             'auc_latent': auc_latent,
+            'auc_latent_pca': auc_latent_pca,
             'n_samples': len(labels)
         }
 
     return results
 
-def evaluate(model, loader, alpha, split_name="val"):
-    labels, recon_err, neg_elbo, latent_energy = compute_scores(model, loader, alpha)
+def evaluate(model, loader, alpha, split_name="val", val_loader=None):
+    # Prepare latent density model if val_loader provided
+    if val_loader is not None:
+        pca, rv, log_lik_normal = prepare_latent_density_model(model, val_loader)
+        labels, recon_err, neg_elbo, latent_energy, latent_p_value = compute_scores(model, loader, alpha, pca, rv, log_lik_normal)
+    else:
+        labels, recon_err, neg_elbo, latent_energy, latent_p_value = compute_scores(model, loader, alpha)
+
     # For each score we compute AUC (higher score = more anomalous)
     auc_recon = roc_auc_score(labels, recon_err)
     auc_elbo  = roc_auc_score(labels, neg_elbo)
     auc_latent = roc_auc_score(labels, latent_energy)
-    print(f"[{split_name}] AUC (recon error): {auc_recon:.4f} | AUC (neg ELBO): {auc_elbo:.4f} | AUC (latent energy): {auc_latent:.4f}")
+    # For p_value: lower p_value = more anomalous, so use 1 - p_value for AUC
+    auc_latent_pca = roc_auc_score(labels, 1 - latent_p_value) if np.any(latent_p_value != 0) else 0.5
+    print(f"[{split_name}] AUC (recon error): {auc_recon:.4f} | AUC (neg ELBO): {auc_elbo:.4f} | AUC (latent energy): {auc_latent:.4f} | AUC (latent PCA p-value): {auc_latent_pca:.4f}")
     # also compute average precision
     ap_recon = average_precision_score(labels, recon_err)
     ap_elbo = average_precision_score(labels, neg_elbo)
     ap_latent = average_precision_score(labels, latent_energy)
-    print(f"[{split_name}] AP (recon): {ap_recon:.4f} | AP (ELBO): {ap_elbo:.4f} | AP (latent): {ap_latent:.4f}")
+    ap_latent_pca = average_precision_score(labels, 1 - latent_p_value) if np.any(latent_p_value != 0) else 0.5
+    print(f"[{split_name}] AP (recon): {ap_recon:.4f} | AP (ELBO): {ap_elbo:.4f} | AP (latent): {ap_latent:.4f} | AP (latent PCA): {ap_latent_pca:.4f}")
     return {
         "labels": labels,
         "recon_err": recon_err,
         "neg_elbo": neg_elbo,
         "latent_energy": latent_energy,
+        "latent_p_value": latent_p_value,
         "auc_recon": auc_recon,
         "auc_elbo": auc_elbo,
-        "auc_latent": auc_latent
+        "auc_latent": auc_latent,
+        "auc_latent_pca": auc_latent_pca
     }
