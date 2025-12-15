@@ -8,7 +8,7 @@ from data import train_loader, val_loader, test_loader
 from model import ConvVAE
 from train import train_epoch
 from evaluate import compute_mse_kl_stats, evaluate, evaluate_per_class
-from visualisation import visulize_model_recon_examples, visualize_ROC_curves, visualize_per_class_auc, visualize_latent_space
+from visualisation import visulize_model_recon_examples, visualize_ROC_curves, visualize_per_class_auc, visualize_latent_space, visualize_distribution_of_scores
 import torch
 import os
 
@@ -141,6 +141,7 @@ def main():
     print_in_frame("Step 3: Evaluate on test set")
     test_results = evaluate(trained_model, test_loader, optimal_alpha, split_name="test")
     visualize_ROC_curves(test_results)
+    visualize_distribution_of_scores(test_results)
 
     print_in_frame("Step 4: Per-class evaluation")
     per_class_results = evaluate_per_class(trained_model, test_loader, optimal_alpha)

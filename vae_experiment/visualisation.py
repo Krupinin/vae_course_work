@@ -16,7 +16,7 @@ def visulize_model_recon_examples(model):
     with torch.no_grad():
         recon_x, mu, logvar, z = model(x_batch)
     # Выберем первые 8 изображений и покажем оригинал/реконструкцию
-    n_show = 8
+    n_show = 20
     orig = x_batch[:n_show].cpu()
     recon = recon_x[:n_show].cpu()
     grid = torch.cat([orig, recon], dim=0)
@@ -125,3 +125,57 @@ def visualize_latent_space(model):
         os.makedirs('diagrams', exist_ok=True)
         plt.savefig('diagrams/latent_space.png')
         plt.close()
+
+def visualize_distribution_of_scores(test_metrics):
+    """ График распределения скоров для нормальных и аномальных примеров """
+    plt.figure(figsize=(12, 4))
+
+    # Negative ELBO
+    plt.subplot(1, 3, 1)
+    normal_scores = test_metrics["neg_elbo"][test_metrics["labels"] == 0]
+    anomaly_scores = test_metrics["neg_elbo"][test_metrics["labels"] == 1]
+    plt.hist(normal_scores, bins=50, alpha=0.7, label='Normal', color='blue')
+    plt.hist(anomaly_scores, bins=50, alpha=0.7, label='Anomaly', color='red')
+    # Calculate best threshold using Youden's J statistic
+    fpr, tpr, thresholds = roc_curve(test_metrics["labels"], test_metrics["neg_elbo"])
+    best_thresh_elbo = thresholds[np.argmax(tpr - fpr)]
+    plt.axvline(x=best_thresh_elbo, color='black', linestyle='--', label=f'Threshold: {best_thresh_elbo:.2f}')
+    plt.xlabel('Negative ELBO Score')
+    plt.ylabel('Frequency')
+    plt.title('Distribution of Negative ELBO Scores')
+    plt.legend()
+
+    # Reconstruction Error
+    plt.subplot(1, 3, 2)
+    normal_scores = test_metrics["recon_err"][test_metrics["labels"] == 0]
+    anomaly_scores = test_metrics["recon_err"][test_metrics["labels"] == 1]
+    plt.hist(normal_scores, bins=50, alpha=0.7, label='Normal', color='blue')
+    plt.hist(anomaly_scores, bins=50, alpha=0.7, label='Anomaly', color='red')
+    # Calculate best threshold
+    fpr, tpr, thresholds = roc_curve(test_metrics["labels"], test_metrics["recon_err"])
+    best_thresh_recon = thresholds[np.argmax(tpr - fpr)]
+    plt.axvline(x=best_thresh_recon, color='black', linestyle='--', label=f'Threshold: {best_thresh_recon:.2f}')
+    plt.xlabel('Reconstruction Error')
+    plt.ylabel('Frequency')
+    plt.title('Distribution of Reconstruction Errors')
+    plt.legend()
+
+    # Latent Energy
+    plt.subplot(1, 3, 3)
+    normal_scores = test_metrics["latent_energy"][test_metrics["labels"] == 0]
+    anomaly_scores = test_metrics["latent_energy"][test_metrics["labels"] == 1]
+    plt.hist(normal_scores, bins=50, alpha=0.7, label='Normal', color='blue')
+    plt.hist(anomaly_scores, bins=50, alpha=0.7, label='Anomaly', color='red')
+    # Calculate best threshold
+    fpr, tpr, thresholds = roc_curve(test_metrics["labels"], test_metrics["latent_energy"])
+    best_thresh_latent = thresholds[np.argmax(tpr - fpr)]
+    plt.axvline(x=best_thresh_latent, color='black', linestyle='--', label=f'Threshold: {best_thresh_latent:.2f}')
+    plt.xlabel('Latent Energy')
+    plt.ylabel('Frequency')
+    plt.title('Distribution of Latent Energy')
+    plt.legend()
+
+    plt.tight_layout()
+    os.makedirs('diagrams', exist_ok=True)
+    plt.savefig('diagrams/distribution_of_scores.png')
+    plt.close()
