@@ -165,17 +165,34 @@ def evaluate_per_class(model, test_loader, alpha, pca=None, rv=None, log_lik_nor
         # Labels: 1 for anomalous (c), 0 for normal (class_idx)
         labels = (y_subset.numpy() == c).astype(int)
 
-        # Compute AUC
+        # Compute AUC and ROC curves
         auc_recon = roc_auc_score(labels, rec_err)
+        fpr_recon, tpr_recon, _ = roc_curve(labels, rec_err)
+
         auc_elbo = roc_auc_score(labels, neg_elbo)
+        fpr_elbo, tpr_elbo, _ = roc_curve(labels, neg_elbo)
+
         auc_latent = roc_auc_score(labels, energy)
+        fpr_latent, tpr_latent, _ = roc_curve(labels, energy)
+
+        fpr_latent_pca, tpr_latent_pca = None, None
+        if pca is not None and rv is not None and log_lik_normal is not None:
+            fpr_latent_pca, tpr_latent_pca, _ = roc_curve(labels, 1 - p_values)
 
         results[c] = {
             'auc_recon': auc_recon,
             'auc_elbo': auc_elbo,
             'auc_latent': auc_latent,
             'auc_latent_pca': auc_latent_pca,
-            'n_samples': len(labels)
+            'n_samples': len(labels),
+            'fpr_recon': fpr_recon,
+            'tpr_recon': tpr_recon,
+            'fpr_elbo': fpr_elbo,
+            'tpr_elbo': tpr_elbo,
+            'fpr_latent': fpr_latent,
+            'tpr_latent': tpr_latent,
+            'fpr_latent_pca': fpr_latent_pca,
+            'tpr_latent_pca': tpr_latent_pca
         }
 
     return results

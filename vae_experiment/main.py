@@ -5,7 +5,7 @@ from data import train_loader, val_loader, test_loader
 from model import ConvVAE
 from train import train_epoch
 from evaluate import compute_mse_kl_stats, evaluate, evaluate_per_class, prepare_latent_density_model
-from visualisation import visulize_model_recon_examples, visualize_ROC_curves, visualize_per_class_auc, visualize_latent_space, visualize_distribution_of_scores, visualize_precision_recall_curves, visualize_confusion_matrices
+from visualisation import visulize_model_recon_examples, visualize_ROC_curves, visualize_per_class_auc, visualize_per_class_roc_curves, visualize_latent_space, visualize_distribution_of_scores, visualize_precision_recall_curves, visualize_confusion_matrices
 import torch
 import os
 
@@ -145,6 +145,8 @@ def main():
     for c, res in sorted(per_class_results.items()):
         print(f"Class {c}: AUC recon {res['auc_recon']:.4f}, ELBO {res['auc_elbo']:.4f}, Latent {res['auc_latent']:.4f}, Latent PCA {res['auc_latent_pca']:.4f} (n={res['n_samples']})")
     visualize_per_class_auc(per_class_results)
+    visualize_per_class_roc_curves(per_class_results)
+
 
 if __name__ == '__main__':
     main()

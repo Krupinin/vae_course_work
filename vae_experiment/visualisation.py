@@ -110,6 +110,53 @@ def visualize_per_class_auc(per_class_results):
     plt.savefig('diagrams/per_class_auc.png')
     plt.close()
 
+def visualize_per_class_roc_curves(per_class_results):
+    """ Визуализация ROC кривых для каждого типа аномалии отдельно """
+    # FashionMNIST class names
+    class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
+
+    classes = sorted(per_class_results.keys())
+
+    # Создаем субплоты: по 3 в ряд, столько рядов сколько нужно
+    n_classes = len(classes)
+    n_cols = 3
+    n_rows = (n_classes + n_cols - 1) // n_cols  # ceil division
+
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 5 * n_rows))
+    axes = axes.flatten() if n_classes > 1 else [axes]
+
+    for idx, c in enumerate(classes):
+        ax = axes[idx]
+        res = per_class_results[c]
+
+        # Plot ROC curves for each method
+        if 'fpr_recon' in res and res['fpr_recon'] is not None:
+            ax.plot(res['fpr_recon'], res['tpr_recon'], label=f'Recon Error (AUC = {res["auc_recon"]:.3f})', linewidth=2)
+        if 'fpr_elbo' in res and res['fpr_elbo'] is not None:
+            ax.plot(res['fpr_elbo'], res['tpr_elbo'], label=f'Neg ELBO (AUC = {res["auc_elbo"]:.3f})', linewidth=2)
+        if 'fpr_latent' in res and res['fpr_latent'] is not None:
+            ax.plot(res['fpr_latent'], res['tpr_latent'], label=f'Latent Energy (AUC = {res["auc_latent"]:.3f})', linewidth=2)
+        if 'fpr_latent_pca' in res and res['fpr_latent_pca'] is not None:
+            ax.plot(res['fpr_latent_pca'], res['tpr_latent_pca'], label=f'Latent PCA (AUC = {res["auc_latent_pca"]:.3f})', linewidth=2)
+
+        # Random classifier line
+        ax.plot([0, 1], [0, 1], 'k--', alpha=0.7)
+
+        ax.set_xlabel('False Positive Rate')
+        ax.set_ylabel('True Positive Rate')
+        ax.set_title(f'ROC Curves: Sweater vs {class_names[c]} (Class {c})')
+        ax.legend()
+        ax.grid(True)
+
+    # Hide unused subplots
+    for idx in range(n_classes, len(axes)):
+        axes[idx].set_visible(False)
+
+    plt.tight_layout()
+    os.makedirs('diagrams', exist_ok=True)
+    plt.savefig('diagrams/per_class_roc_curves.png', dpi=150)
+    plt.close()
+
 def visualize_latent_space(model):
     """ Визуализация латентного пространства (2D проекция) """
     if latent_dim >= 2:
