@@ -17,7 +17,7 @@ def visulize_model_recon_examples(model):
     with torch.no_grad():
         recon_x, mu, logvar, z = model(x_batch)
     # Выберем первые 8 изображений и покажем оригинал/реконструкцию
-    n_show = 20
+    n_show = 8
     orig = x_batch[:n_show].cpu()
     recon = recon_x[:n_show].cpu()
     grid = torch.cat([orig, recon], dim=0)
